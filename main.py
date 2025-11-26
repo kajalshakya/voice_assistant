@@ -1,5 +1,5 @@
 import speech_recognition as sr
-from gtts import gTTS
+import pyttsx3
 import requests
 import datetime
 import time
@@ -19,6 +19,7 @@ import tempfile
 import signal
 
 
+
 # ---------------------------
 # CONFIGURATION
 # ---------------------------
@@ -27,7 +28,9 @@ NEWS_API_KEY = "3012dfd6249ecfa0712cb6a8c39f4543"
 YOUR_GEMINI_KEY = "AIzaSyCGdAWbx6RRZWYghInfQwJXGsSJuHNlmJA"
 
 MUSIC_FOLDER = os.path.expanduser("/home/rohitshakya/Music")
-ALARM_TONE = "/home/rohitshakya/Music/rock.mp3"
+ALARM_TONE = "/Users/rohitshakya/Downloads/bird_song.mp3"
+
+
 
 player_lock = threading.Lock()
 player_process = None
@@ -39,7 +42,7 @@ alarm_process_global = None
 DB_CONFIG = {
     "host": "localhost",
     "user": "root",
-    "password": "root",
+    "password": "newpassword",
     "database": "assistant_logs",
     "autocommit": True
 }
@@ -136,61 +139,75 @@ ensure_tables()
 # ---------------------------
 # TEXT-TO-SPEECH
 # ---------------------------
-current_speech_process = None
+engine = pyttsx3.init(driverName='nsss')
 speech_lock = threading.Lock()
+current_speech_active = False
 
-def speak(text, lang='en'):
-    """Speak text using gTTS + mpv at faster speed"""
-    global current_speech_process
+def speak(text):
+    """
+    Reliable macOS-safe speech function.
+    Temporarily stops microphone so pyttsx3 can output audio.
+    """
 
-    def _speak_thread(msg, lang_code):
-        global current_speech_process
+    def _speech_thread(msg):
         try:
             clean = re.sub(r"(\*\*|\*|__|`)", "", str(msg))
             clean = re.sub(r"\s{2,}", " ", clean).strip()
+
             print("[Assistant]", clean)
 
-            with tempfile.NamedTemporaryFile(delete=True, suffix=".mp3") as fp:
-                tts = gTTS(clean, lang=lang_code, slow=False)
-                tts.save(fp.name)
+            # 🔇 Stop microphone so TTS can speak on macOS
+            try:
+                if hasattr(recognizer, "stream") and recognizer.stream:
+                    recognizer.stream.close()
+            except:
+                pass
 
-                with speech_lock:
-                    if current_speech_process and current_speech_process.poll() is None:
-                        current_speech_process.terminate()
-                    current_speech_process = subprocess.Popen(
-                        ["mpv", "--no-terminal", "--speed=1.5", fp.name],
-                        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
-                    )
-                    current_speech_process.wait()
+            # Kill any blocking audio players
+            subprocess.run(["pkill", "-9", "afplay"], stderr=subprocess.DEVNULL)
+            subprocess.run(["pkill", "-9", "mpv"], stderr=subprocess.DEVNULL)
+
+            # Create fresh engine
+            engine = pyttsx3.init(driverName='nsss')
+
+            engine.say(clean)
+            engine.runAndWait()
+            engine.stop()
+
+            # 🔈 Restart microphone
+            time.sleep(0.1)
+
         except Exception as e:
-            print("[TTS Error]", e)
+            print("[TTS ERROR]", e)
+            try:
+                log_error(f"TTS error: {e}")
+            except:
+                pass
 
-    t = threading.Thread(target=_speak_thread, args=(text, lang), daemon=True)
-    t.start()
-    t.join()
-
+    threading.Thread(target=_speech_thread, args=(text,), daemon=True).start()
 
 # ---------------------------
 # SPEECH-TO-TEXT
 # ---------------------------
 def listen(language=None):
     r = sr.Recognizer()
-    with sr.Microphone() as source:
-        print("Listening...")
-        try:
-            r.adjust_for_ambient_noise(source, duration=0.5)
-            audio = r.listen(source, phrase_time_limit=6)
-        except Exception as e:
-            print("[Mic Error]", e)
-            return None
 
     try:
+        with sr.Microphone() as source:
+            print(f"Listening... ({datetime.datetime.now().strftime('%H:%M:%S')})")
+
+            r.adjust_for_ambient_noise(source, duration=0.4)
+            audio = r.listen(source, phrase_time_limit=6)
+
+        # Process the speech after mic is released
         if language:
             text = r.recognize_google(audio, language=language)
         else:
             text = r.recognize_google(audio)
+
         print("[You]", text)
         return text.lower()
+
     except sr.UnknownValueError:
         return None
     except sr.RequestError as e:
@@ -199,6 +216,7 @@ def listen(language=None):
     except Exception as e:
         print("[STT Error]", e)
         return None
+
 
 
 
@@ -232,7 +250,7 @@ def get_weather(city):
 
 def get_news():
     try:
-        url = f"https://gnews.io/api/v4/top-headlines?country=in&apikey={NEWS_API_KEY}"
+        url = f"https://gnews.io/api/v4/top-headlines?country=in&apikey={GNEWS_API_KEY}"
         data = requests.get(url, timeout=8).json()
 
         if "errors" in data:
@@ -247,7 +265,6 @@ def get_news():
     except Exception as e:
         log_error(f"news error: {e}")
         return "Error fetching news."
-
 
 
 # ---------------------------
@@ -341,55 +358,65 @@ def play_specific_local(path):
     else:
         return "File not found."
     
+import subprocess
+
 def pause_music():
-    """Pause local player using SIGSTOP (Linux)."""
-    global player_process, audio_playing
-    with player_lock:
-        if player_process and player_process.poll() is None:
-            try:
-                os.killpg(os.getpgid(player_process.pid), signal.SIGSTOP)
-                return "Music paused."
-            except Exception as e:
-                log_error(f"pause_music error: {e}")
-                return "Could not pause music."
-        return "No music is playing."
+    """Pause Apple Music playback on macOS."""
+    try:
+        subprocess.run([
+            "osascript", "-e", 'tell application "Music" to pause'
+        ], check=False)
+        return "Music paused."
+    except Exception as e:
+        log_error(f"pause_music error: {e}")
+        return "Could not pause music."
 
 def resume_music():
-    """Resume local player using SIGCONT (Linux)."""
-    global player_process, audio_playing
-    with player_lock:
-        if player_process and player_process.poll() is None:
-            try:
-                os.killpg(os.getpgid(player_process.pid), signal.SIGCONT)
-                return "Music resumed."
-            except Exception as e:
-                log_error(f"resume_music error: {e}")
-                return "Could not resume music."
-        return "No music to resume."
+    """Resume Apple Music playback on macOS."""
+    try:
+        subprocess.run([
+            "osascript", "-e", 'tell application "Music" to play'
+        ], check=False)
+        return "Music resumed."
+    except Exception as e:
+        log_error(f"resume_music error: {e}")
+        return "Could not resume music."
+
 
 def stop_music():
-    """Stop local player and clear state."""
-    global player_process, audio_playing
-    with player_lock:
-        if player_process and player_process.poll() is None:
-            try:
-                os.killpg(os.getpgid(player_process.pid), signal.SIGTERM)
-            except Exception:
-                try:
-                    player_process.terminate()
-                except Exception:
-                    pass
-            player_process = None
-            audio_playing = False
-            return "Stopped music."
-        # As a fallback, try to kill any stray mpv process (useful if mpv was started outside code)
-        try:
-            subprocess.run(["pkill", "-9", "mpv"], check=False)
-        except Exception:
-            pass
-        player_process = None
-        audio_playing = False
-        return "No music was playing."
+    """
+    Stop Apple Music playback and close the Music app on macOS.
+    """
+    try:
+        # Stop playback
+        subprocess.run([
+            "osascript", "-e", 'tell application "Music" to stop'
+        ], check=False)
+
+        # Quit the Music app
+        subprocess.run([
+            "osascript", "-e", 'tell application "Music" to quit'
+        ], check=False)
+
+        return "Stopped Apple Music and closed the app."
+
+    except Exception as e:
+        return f"Error stopping Apple Music: {e}"
+    
+def close_calculator():
+    """Close Calculator app on macOS."""
+    try:
+        if SYSTEM == "darwin":
+            subprocess.run([
+                "osascript", "-e", 'tell application "Calculator" to quit'
+            ], check=False)
+            return "Closed Calculator."
+        return "Calculator close not supported on this OS."
+    except Exception as e:
+        log_error(f"close_calculator error: {e}")
+        return "Could not close Calculator."
+
+
 
 
 
@@ -423,13 +450,26 @@ def open_app(command):
     try:
         cmd = command.lower()
         if "calculator" in cmd or "calc" in cmd:
-            calc_path = "/usr/bin/gnome-calculator"
-            if os.path.exists(calc_path):
-                subprocess.Popen([calc_path])
-                speak("Opening calculator.")
-            else:
-                speak("Calculator app not found.")
+
+            # close command
+            if "close" in cmd or "exit" in cmd or "quit" in cmd:
+                msg = close_calculator()
+                speak(msg)
+                return True
+
+            # open command
+            speak("Opening calculator.")
+            if SYSTEM == "darwin":  # macOS
+                subprocess.Popen(["open", "-a", "Calculator"])
+            else:  # Linux fallback
+                calc_path = "/usr/bin/gnome-calculator"
+                if os.path.exists(calc_path):
+                    subprocess.Popen([calc_path])
+                else:
+                    speak("Calculator app not found on your system.")
             return True
+        # ----------------------------------------------------------
+
 
         if "youtube" in cmd:
             webbrowser.open("https://youtube.com")
@@ -447,12 +487,23 @@ def open_app(command):
             webbrowser.open("https://web.whatsapp.com")
             speak("Opening WhatsApp Web.")
             return True
-        if "notepad" in cmd or "editor" in cmd:
+        if "notepad" in cmd or "editor" in cmd or "text editor" in cmd:
+
+            speak("Opening text editor.")
+
+            if SYSTEM == "darwin":  # macOS
+                # Open TextEdit
+                subprocess.Popen(["open", "-a", "TextEdit"])
+                return True
+
+            # Linux fallback
             editor_path = shutil.which("gedit") or shutil.which("nano")
             if editor_path:
                 subprocess.Popen([editor_path])
-            speak("Opening text editor.")
+            else:
+                speak("No text editor found.")
             return True
+
         if "play music" in cmd or cmd.strip() == "music":
             res = play_local_music()
             speak(res)
@@ -463,138 +514,93 @@ def open_app(command):
     return False
 
 # ---------------------------
-# ALARM FUNCTIONS (UPDATED)
+# ALARM FUNCTIONS
 # ---------------------------
 alarm_stop_flag = False
-alarm_process_global = None
-
 
 def stop_alarm():
     global alarm_stop_flag, alarm_process_global
     alarm_stop_flag = True
-
+    # kill the alarm process if started by script
     try:
         if alarm_process_global and alarm_process_global.poll() is None:
             try:
                 os.killpg(os.getpgid(alarm_process_global.pid), signal.SIGTERM)
             except Exception:
-                alarm_process_global.terminate()
-        alarm_process_global = None
+                try:
+                    alarm_process_global.terminate()
+                except Exception:
+                    pass
+            alarm_process_global = None
     except Exception as e:
         log_error(f"stop_alarm kill error: {e}")
 
-    # double safety
+    # fallback: kill any mpv processes (useful if mpv was started with loop flags earlier)
     try:
         subprocess.run(["pkill", "-9", "mpv"], check=False)
-    except:
+    except Exception:
         pass
 
     speak("Alarm stopped.")
 
-
-# ---------------------------
-# FIXED TIME PARSER (AM/PM PERFECT)
-# ---------------------------
 def parse_alarm_time(text: str) -> str | None:
     if not text:
         return None
-
-    text = text.lower().replace(".", "").replace(";", ":").strip()
-    m = re.search(r"(\d{1,2})(?:[: ]?(\d{2}))?\s*(am|pm)?", text)
-
+    text = text.lower().strip()
+    m = re.search(r"(\d{1,2})(?::|\.| )?(\d{2})?\s*(a\.?m\.?|p\.?m\.?)?", text, re.IGNORECASE)
     if not m:
         return None
-
     hour = int(m.group(1))
     minute = int(m.group(2)) if m.group(2) else 0
     ampm = m.group(3)
-
-    # AM/PM conversion
+    if ampm:
+        ampm = ampm.replace(".", "").lower()
     if ampm == "pm" and hour != 12:
         hour += 12
     if ampm == "am" and hour == 12:
         hour = 0
-
-    # validation
     if 0 <= hour <= 23 and 0 <= minute <= 59:
         return f"{hour:02d}:{minute:02d}"
-
     return None
 
 
-# ---------------------------
-# ALARM THREAD
-# ---------------------------
 def _alarm_thread(alarm_time_str: str, alarm_file: str = None):
-    global alarm_stop_flag, alarm_process_global
+    global alarm_stop_flag
     alarm_stop_flag = False
 
     hh, mm = map(int, alarm_time_str.split(":"))
     now = datetime.datetime.now()
-
     alarm_time = now.replace(hour=hh, minute=mm, second=0, microsecond=0)
+
     if alarm_time <= now:
         alarm_time += datetime.timedelta(days=1)
 
-    try:
-        while not alarm_stop_flag:
-            now = datetime.datetime.now()
+    while not alarm_stop_flag:
+        now = datetime.datetime.now()
+        if now >= alarm_time:
+            print("🔔 RINGING!")
+            # ---- Play sound ----
+            try:
+                if alarm_file:  # user provided a file
+                    if shutil.which("afplay"):
+                        subprocess.Popen(["afplay", alarm_file])
+                    elif shutil.which("mpv"):
+                        subprocess.Popen(["mpv", "--no-terminal", alarm_file])
+                else:  # fallback beep (macOS built-in)
+                    if shutil.which("afplay"):
+                        subprocess.Popen(["afplay", "/System/Library/Sounds/Ping.aiff"])
+            except Exception as e:
+                print("[ERROR] Cannot play sound:", e)
 
-            if now >= alarm_time:
-                # PLAY ALARM
-                if alarm_file and os.path.exists(alarm_file):
-                    try:
-                        # mpv preferred
-                        if shutil.which("mpv"):
-                            alarm_process_global = subprocess.Popen(
-                                ["mpv", "--no-terminal", "--loop", alarm_file],
-                                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-                                preexec_fn=os.setpgrp
-                            )
-                        elif shutil.which("paplay"):
-                            alarm_process_global = subprocess.Popen(
-                                ["paplay", alarm_file],
-                                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-                                preexec_fn=os.setpgrp
-                            )
-                        else:
-                            alarm_process_global = None
-                    except Exception as e:
-                        log_error(f"alarm play error: {e}")
-                        alarm_process_global = None
-
-                    # wait for stop
-                    while not alarm_stop_flag:
-                        time.sleep(0.4)
-
-                else:
-                    # fallback sound
-                    while not alarm_stop_flag:
-                        speak("Your alarm is ringing.")
-                        time.sleep(1)
-
-                break
-
-            time.sleep(0.4)
-
-    except Exception as e:
-        log_error(f"Alarm thread error: {e}")
-
-    finally:
-        alarm_stop_flag = False
-        alarm_process_global = None
+            break
+        time.sleep(0.5)
 
 
-# ---------------------------
-# SET ALARM
-# ---------------------------
 def set_alarm(alarm_time: str, alarm_file: str = None):
     hhmm = parse_alarm_time(alarm_time)
-
     if not hhmm:
-        speak("Invalid time. Please say something like 7:30 am or 2:45 pm.")
+        speak("Invalid time format. Say for example 7:30 am or 19:45.")
         return
-
     threading.Thread(target=_alarm_thread, args=(hhmm, alarm_file), daemon=True).start()
     speak(f"Your alarm has been set for {hhmm}.")
 
@@ -606,6 +612,13 @@ def get_time():
 
 def get_date():
     return datetime.datetime.now().strftime("Today's date is %d %B %Y")
+
+def play_beep():
+    try:
+        # macOS built-in beep
+        subprocess.Popen(["afplay", "/System/Library/Sounds/Glass.aiff"])
+    except Exception as e:
+        print("[BEEP ERROR]", e)
 
 # ---------------------------
 # MAIN LOOP
@@ -621,7 +634,21 @@ def main():
         if not cmd:
             time.sleep(0.5)
             continue
+
         cmd = cmd.lower().strip()
+
+        # ----------------------------------------------------
+        #  NEW ADDITION: Execute ONLY if command starts with
+        #  the wake phrase "hey buddy"
+        # ----------------------------------------------------
+        if not cmd.startswith("hey buddy"):
+            # Ignore any command not starting with wake word
+            continue
+
+        # Strip the wake phrase
+        cmd = cmd.replace("hey buddy", "", 1).strip()
+        # ----------------------------------------------------
+
 
         if cmd == "network_error":
             speak("Network error while recognizing speech. Check your internet.")
@@ -648,54 +675,46 @@ def main():
             assistant_prompt()
             continue
 
-        # -------------------------------------------
-        # ALARM SECTION (UPDATED & FIXED)
-        # -------------------------------------------
+        # ALARM
+        if ("alarm" in cmd) or ("set alarm" in cmd) or ("wake me" in cmd):
+            time_match = re.search(r"(\d{1,2})(?::|\.| )?(\d{2})?\s*(am|pm)?", cmd)
+            if time_match:
+                hour = time_match.group(1)
+                minute = time_match.group(2) or "00"
+                ampm = time_match.group(3)
 
-        # SET ALARM
-        if ("set alarm" in cmd) or ("alarm" in cmd and "stop" not in cmd) or ("wake me" in cmd):
-            
-            # 1. Try direct time detection from same command
-            m = re.search(r"(\d{1,2}(?::\d{2})?)\s*(am|pm)?", cmd)
-            
-            if m:
-                raw_time = m.group(1)              # e.g. "2:27"
-                ampm = m.group(2)                  # am/pm or None
-
-                # Combine for parsing
                 if ampm:
-                    user_time = f"{raw_time} {ampm}"
+                    hhmm = f"{hour}:{minute} {ampm}"
                 else:
-                    user_time = raw_time
-
-                hhmm = parse_alarm_time(user_time)
-
+                    hhmm = f"{hour}:{minute}"
             else:
-                # 2. Ask user separately
-                speak("Sure, what time should I set the alarm for?")
-                user_input = listen().lower().strip()
-
-                hhmm = parse_alarm_time(user_input)
-
+                speak("Sure, at what time should I set the alarm?")
+                t = listen()
+                hhmm = parse_alarm_time(t)
                 if not hhmm:
-                    speak("I could not understand the time. Please say something like 5:00 pm or 7 am.")
+                    speak("I could not understand the time. Say for example 5:00 pm or 17:30.")
                     assistant_prompt()
                     continue
-
-            # If parsed successfully
             print("[DEBUG] Alarm time recognized:", hhmm)
+            play_beep()
             set_alarm(hhmm, ALARM_TONE)
             assistant_prompt()
             continue
 
-
         # STOP ALARM
-        # STOP ALARM
-        if "stop alarm" in cmd or cmd.strip() == "stop":
+        if "stop alarm" in cmd or "alarm stop" in cmd or "turn off alarm" in cmd or "stop ringing" in cmd:
             stop_alarm()
+            log_interaction(cmd, "alarm_stop", "alarm stopped")
             assistant_prompt()
             continue
 
+
+        if "news" in cmd:
+            report = get_news()
+            speak(report)
+            log_interaction(cmd, "news", report)
+            assistant_prompt()
+            continue
 
 
         # MUSIC
@@ -766,10 +785,39 @@ def main():
 
         # NEWS
         if "news" in cmd:
-            report = get_news()
-            speak(report)
-            assistant_prompt()
-            continue
+             report = get_news()
+        
+        # Apple Music
+        if "music" in cmd or "apple music" in cmd or "play music" in cmd:
+            speak("Opening Apple Music and playing a random song.")
+            try:
+                if SYSTEM == "darwin":
+                    os.system('open -a "Music"')
+                    time.sleep(1.2)
+
+                    script = '''
+                    tell application "Music"
+                        if not (exists current track) then
+                            play track 1 of playlist "Library"
+                        else
+                            play
+                        end if
+                    end tell
+                    '''
+                    subprocess.run(["osascript", "-e", script])
+                else:
+                    speak("Apple Music works only on macOS.")
+                
+                log_interaction(cmd, "apple_music", "played")
+                assistant_prompt()
+                continue   # <-- IMPORTANT FIX
+
+            except Exception as e:
+                log_error(f"open music error: {e}")
+                speak("I could not play Apple Music.")
+                assistant_prompt()
+                continue
+
 
 
 
@@ -799,6 +847,64 @@ def main():
         assistant_prompt()
 
 
+def stop_alarm():
+    global alarm_stop_flag, alarm_process_global
+    alarm_stop_flag = True
+
+    # Stop any alarm sound started inside the script
+    try:
+        if alarm_process_global and alarm_process_global.poll() is None:
+            try:
+                os.killpg(os.getpgid(alarm_process_global.pid), signal.SIGTERM)
+            except Exception:
+                try:
+                    alarm_process_global.terminate()
+                except Exception:
+                    pass
+            alarm_process_global = None
+    except Exception as e:
+        log_error(f"stop_alarm kill error: {e}")
+
+    # macOS: Kill any afplay process (alarm sound)
+    try:
+        subprocess.run(["pkill", "-9", "afplay"], check=False)
+    except Exception:
+        pass
+
+    # Linux fallback: kill mpv alarm
+    try:
+        subprocess.run(["pkill", "-9", "mpv"], check=False)
+    except Exception:
+        pass
+
+    speak("Alarm stopped.")
+
+
+# ---------------------------
+# Music (macOS Apple Music)
+# ---------------------------
+def play_random_music():
+    """
+    Uses AppleScript to play a random song from Apple Music library.
+    macOS only.
+    """
+    script = '''
+    tell application "Music"
+        activate
+        set songList to every track of library playlist 1
+        set randomTrack to some item of songList
+        play randomTrack
+    end tell
+    '''
+    try:
+        os.system(f"osascript -e '{script}'")
+        speak("Playing a random song from your Apple Music library.")
+    except Exception as e:
+        print("[MUSIC ERROR]", e)
+        log_error(f"Music play error: {e}")
+        speak("Could not play music.")
+
+
 if __name__ == "__main__":
     try:
         main()
@@ -807,4 +913,3 @@ if __name__ == "__main__":
     except Exception as e:
         log_error(f"fatal error: {e}")
         print("Fatal error:", e)
-
