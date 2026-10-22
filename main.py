@@ -7,6 +7,7 @@ import random
 import re
 import shutil
 import signal
+import yt_dlp
 from dotenv import load_dotenv
 import sqlite3
 import subprocess
@@ -16,6 +17,7 @@ import webbrowser
 import mysql.connector
 import requests
 import speech_recognition as sr
+from urllib.parse import quote_plus
 from groq import Groq
 load_dotenv()
 
@@ -918,28 +920,42 @@ class YouTubeMiniPlayer:
         self.current_url = None
 
     def play(self, query=None):
+        if not query:
+            return "Please specify a song."
 
-        if query:
+        search_url = "ytsearch1:" + query
+
+        options = {
+            "quiet": True,
+            "no_warnings": True,
+            "extract_flat": True,
+        }
+
+        try:
+            with yt_dlp.YoutubeDL(options) as ydl:
+                info = ydl.extract_info(
+                    search_url,
+                    download=False
+                )
+
+            entries = info.get("entries", [])
+            if not entries:
+                return "Song not found."
+
+            video_id = entries[0].get("id")
             self.current_url = (
-                "https://www.youtube.com/results"
-                f"?search_query={query.replace(' ', '+')}"
+                "https://www.youtube.com/watch?v=" + video_id
             )
 
-        if not self.current_url:
-            return "No song specified."
+            webbrowser.open(self.current_url)
+            return f"Opening {query} on YouTube."
 
-        webbrowser.open(self.current_url)
-
-        return f"Playing {query} on YouTube."
+        except Exception as e:
+            print("YouTube error:", e)
+            return "Could not find the song."
 
     def stop(self):
-
-        self.current_url = None
-
-        return (
-            "Stopped YouTube playback "
-            "(close browser tab manually)."
-        )
+        return "Please stop playback in YouTube."
 
 
 youtube_player = YouTubeMiniPlayer()
@@ -1638,7 +1654,7 @@ def main():
             assistant_prompt()
             continue
 
-        # Music controls
+        # Music control
         if (
             "music" in cmd
             or cmd.startswith("play ")
@@ -1750,6 +1766,7 @@ def main():
                 assistant_prompt()
                 continue
 
+            
             # Random Apple Music
             if cmd in (
                 "music",
@@ -1768,27 +1785,7 @@ def main():
                 assistant_prompt()
                 continue
 
-            # Specific song on YouTube
-            if cmd.startswith("play "):
-
-                song = cmd.replace(
-                    "play ",
-                    "",
-                    1
-                ).strip()
-
-                response = youtube_player.play(song)
-
-                speak(response)
-
-                log_interaction(
-                    cmd,
-                    "music_youtube",
-                    song
-                )
-
-                assistant_prompt()
-                continue
+         
 
         # Applications
         if open_app(cmd):
@@ -1833,8 +1830,9 @@ def main():
         ):
 
             location = re.sub(
-                r"\b(hey buddy|give me|tell me|show me|"
-                r"latest|today|today's|news|headline|headlines)\b",
+                r"\b(hey buddy|what's|what is|the|give me|tell me|"
+                r"show me|latest|today|today's|top|"
+                r"news|headline|headlines)\b",
                 "",
                 cmd,
                 flags=re.IGNORECASE
@@ -1949,6 +1947,37 @@ def main():
             assistant_prompt()
             continue
 
+
+        
+     
+        # Play a specific song on YouTube
+        if "play" in cmd and "youtube" in cmd:
+
+            song = re.sub(r"\bhey buddy\b", "", cmd, flags=re.I)
+            song = re.sub(r"\bon youtube\b", "", song, flags=re.I)
+            song = re.sub(r"\byoutube\b", "", song, flags=re.I)
+            song = re.sub(r"\bplay\b", "", song, count=1, flags=re.I)
+            song = song.strip()
+
+            if song:
+                response = youtube_player.play(song)
+                speak(response)
+
+                log_interaction(
+                    cmd,
+                    "youtube_song",
+                    song
+                )
+            else:
+                speak("Please tell me the song name.")
+
+            assistant_prompt()
+            continue
+
+
+
+
+        
         # General AI fallback
         response = ask_gpt(cmd)
 
