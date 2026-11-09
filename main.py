@@ -56,14 +56,38 @@ USE_MYSQL = True
 speech_lock = threading.Lock()
 speech_process = None
 
+# Speech interruption support
+speech_context = threading.local()
+
+speech_generation = 0
+speech_generation_lock = threading.Lock()
+
+
+def set_speech_generation(generation):
+    global speech_generation
+
+    with speech_generation_lock:
+        speech_generation = generation
+
+
+def set_speech_context(generation):
+    speech_context.generation = generation
+
+
+def is_speech_generation_valid(generation):
+    if generation is None:
+        return True
+
+    with speech_generation_lock:
+        return generation == speech_generation
+
+
 player_lock = threading.Lock()
 player_process = None
 audio_playing = False
 
 alarm_process_global = None
 alarm_stop_flag = False
-
-
 # ============================================================
 # DATABASE
 # ============================================================
@@ -251,13 +275,28 @@ def stop_speaking():
     if process and process.poll() is None:
         try:
             process.terminate()
+
+            try:
+                process.wait(timeout=1)
+
+            except subprocess.TimeoutExpired:
+                process.kill()
+                process.wait(timeout=1)
+
             print("[Speech] Stopped.")
+
         except Exception as e:
             print("[TTS STOP ERROR]", e)
 
 
 def speak(text):
     global speech_process
+
+    expected_generation = getattr(
+        speech_context,
+        "generation",
+        None
+    )
 
     clean = re.sub(
         r"(\*\*|\*|__|`)",
@@ -274,18 +313,40 @@ def speak(text):
     if not clean:
         return
 
+    if not is_speech_generation_valid(expected_generation):
+        return
+
     print("[Assistant]", clean)
+
+    process = None
 
     try:
         with speech_lock:
 
-            if (
-                speech_process
-                and speech_process.poll() is None
-            ):
-                speech_process.wait()
+            # Check whether this command is still valid
+            if not is_speech_generation_valid(expected_generation):
+                return
 
-            speech_process = subprocess.Popen(
+            # Stop previous speech
+            if speech_process and speech_process.poll() is None:
+
+                old_process = speech_process
+
+                try:
+                    old_process.terminate()
+                    old_process.wait(timeout=1)
+
+                except subprocess.TimeoutExpired:
+                    old_process.kill()
+                    old_process.wait(timeout=1)
+
+            speech_process = None
+
+            # Check again before starting speech
+            if not is_speech_generation_valid(expected_generation):
+                return
+
+            process = subprocess.Popen(
                 [
                     "say",
                     "-v",
@@ -296,28 +357,52 @@ def speak(text):
                 ]
             )
 
-        speech_process.wait()
+            speech_process = process
+
+        process.wait()
 
         with speech_lock:
-            speech_process = None
+            if speech_process is process:
+                speech_process = None
 
     except Exception as e:
+
         print("[TTS ERROR]", e)
-        log_error(f"TTS error: {e}")
 
+        log_error(
+            f"TTS error: {e}"
+        )
 
+    finally:
+
+        if process:
+            with speech_lock:
+                if speech_process is process:
+                    speech_process = None
 # ============================================================
 # SPEECH RECOGNITION
 # ============================================================
 
-def listen(language=None):
+def listen(language=None, command_id=None):
+
     recognizer = sr.Recognizer()
 
     recognizer.pause_threshold = 1.0
     recognizer.phrase_threshold = 0.3
     recognizer.non_speaking_duration = 0.5
 
+    def command_is_valid():
+
+        if command_id is None:
+            return True
+
+        return is_speech_generation_valid(command_id)
+
     try:
+
+        if not command_is_valid():
+            return None
+
         with sr.Microphone() as source:
 
             print(
@@ -325,10 +410,28 @@ def listen(language=None):
                 datetime.datetime.now().strftime("%H:%M:%S")
             )
 
-            audio = recognizer.listen(
-                source,
-                phrase_time_limit=10
-            )
+            # Check for cancellation while waiting for speech
+            while command_is_valid():
+
+                try:
+
+                    audio = recognizer.listen(
+                        source,
+                        timeout=0.5,
+                        phrase_time_limit=10
+                    )
+
+                    break
+
+                except sr.WaitTimeoutError:
+                    continue
+
+            else:
+                return None
+
+        # Check before speech recognition
+        if not command_is_valid():
+            return None
 
         if language:
 
@@ -341,56 +444,101 @@ def listen(language=None):
 
             text = recognizer.recognize_google(audio)
 
+        # Ignore results from interrupted commands
+        if not command_is_valid():
+            return None
+
         print("[You]", text)
 
         return text.lower()
 
     except sr.UnknownValueError:
+
         return None
 
     except sr.RequestError as e:
+
+        if not command_is_valid():
+            return None
+
         print("[STT Network Error]", e)
+
         return "network_error"
 
     except Exception as e:
-        print("[STT Error]", e)
-        return None
 
+        if not command_is_valid():
+            return None
+
+        print("[STT Error]", e)
+
+        return None
 
 # ============================================================
 # WEATHER
 # ============================================================
 
+
+
+
 def get_weather(city):
     try:
+        city = city.strip()
+
+        if not city:
+            return "Please specify a city name."
+
+        encoded_city = quote_plus(city)
+
         url = (
             "https://api.openweathermap.org/data/2.5/weather"
-            f"?q={city}"
+            f"?q={encoded_city}"
             f"&appid={WEATHER_API_KEY}"
             "&units=metric"
         )
 
-        response = requests.get(
-            url,
-            timeout=8
-        )
-
+        response = requests.get(url, timeout=10)
         data = response.json()
 
-        if data.get("cod") != 200:
-            return "City not found."
+        print("[WEATHER API STATUS]", response.status_code)
+        print("[WEATHER API RESPONSE]", data)
+
+        if response.status_code == 404:
+            return f"Sorry, I could not find the city {city}."
+
+        if response.status_code == 401:
+            return "Weather API key is invalid. Please check your API key."
+
+        if response.status_code == 429:
+            return "Weather service limit reached. Please try again later."
+
+        if response.status_code != 200:
+            return "Unable to fetch weather information right now."
 
         temperature = data["main"]["temp"]
+        feels_like = data["main"]["feels_like"]
         description = data["weather"][0]["description"]
+        humidity = data["main"]["humidity"]
+        city_name = data["name"]
 
         return (
-            f"The temperature in {city} is "
-            f"{temperature}°C with {description}."
+            f"The current weather in {city_name} is {temperature} "
+            f"degrees Celsius with {description}. "
+            f"It feels like {feels_like} degrees Celsius. "
+            f"Humidity is {humidity} percent."
         )
+
+    except requests.exceptions.Timeout:
+        return "Weather request timed out. Please try again."
+
+    except requests.exceptions.RequestException as e:
+        log_error(f"Weather network error: {e}")
+        return "Unable to connect to the weather service."
 
     except Exception as e:
         log_error(f"Weather error: {e}")
         return "Error fetching weather."
+
 
 
 # ============================================================
@@ -508,16 +656,50 @@ def ask_gpt(question):
             messages=[
                 {
                     "role": "system",
-                    "content": (
-                        "You are a helpful voice assistant. "
-                        "Answer directly and clearly. "
-                        "Give short, simple answers suitable "
-                        "for voice conversation. "
-                        "Usually answer in 1 to 3 sentences. "
-                        "If the user asks for code or a detailed "
-                        "explanation, provide only what is necessary. "
-                        "Do not ask unnecessary questions."
-                    )
+                   "content": (
+                            "You are a personal AI voice assistant developed by Kajal Shakya. "
+                            "You are powered by Groq AI using OpenAI's GPT-OSS-120B model. "
+
+                            "If the user asks 'Who are you?', respond: "
+                            "'I am your personal AI voice assistant, developed by Kajal Shakya and powered by Groq AI.' "
+
+                            "If the user asks who developed you, respond: "
+                            "'I was developed by Kajal Shakya.' "
+
+                            "If the user asks which AI model you use, respond: "
+                            "'I use OpenAI's GPT-OSS-120B model through Groq AI.' "
+
+                            "Never claim to be ChatGPT, Gemini, or an OpenAI chatbot. "
+
+                            "You are a multilingual AI assistant. "
+                            "Understand and communicate in multiple languages, including English, Hindi, Hinglish, "
+                            "and other commonly spoken languages. "
+
+                            "Automatically detect the language used by the user. "
+                            "Always respond in the same language as the user's latest message. "
+                            "If the user speaks in Hindi, respond in Hindi. "
+                            "If the user speaks in Hinglish, respond in natural Hinglish. "
+                            "If the user speaks in English, respond in English. "
+                            "If the user switches languages, adapt your response accordingly. "
+                            "Never force English when the user prefers another language. "
+
+                            "Make every response sound like natural human conversation. "
+                            "Do not use bullet points, numbered lists, headings, "
+                            "or markdown formatting in normal voice conversations. "
+
+                            "Keep answers conversational and easy to speak aloud. "
+                            "Always generate complete responses suitable for text-to-speech. "
+
+                            "Do not give unnecessary explanations. "
+                            "Use simple, friendly and natural language. "
+
+                            "Answer directly and clearly. "
+                            "Keep responses short and simple for voice conversations. "
+                            "Usually respond in 1 to 3 sentences. "
+                            "Provide detailed explanations only when requested. "
+                            "Do not ask unnecessary questions."
+                        )
+                                                
                 },
                 {
                     "role": "user",
@@ -1654,7 +1836,7 @@ def main():
             assistant_prompt()
             continue
 
-        # Music control
+        # Music control 
         if (
             "music" in cmd
             or cmd.startswith("play ")
@@ -1998,20 +2180,6 @@ def main():
 
 if __name__ == "__main__":
 
-    try:
-        main()
-
-    except KeyboardInterrupt:
-
-        print("Exiting...")
-
-    except Exception as e:
-
-        log_error(
-            f"Fatal error: {e}"
-        )
-
-        print(
-            "Fatal error:",
-            e
-        )
+    print(
+        "Please start the assistant using api.py"
+    )

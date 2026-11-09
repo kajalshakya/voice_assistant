@@ -1,26 +1,23 @@
-# Environment variables
-.env
-
-# Virtual environment
-venv/
-.venv/
-
 # Python
+venv/
 __pycache__/
 *.py[cod]
 
-# macOS
-.DS_Store
+# Environment
+.env
+.env.*
 
-# IDE
-.vscode/
+!.env.example
 
-# Databases
+# Database
 *.db
 *.sqlite
 *.sqlite3
 
-# Logs
+# Node
+node_modules/
+dist/
+
+# System
+.DS_Store
 *.log
-
-

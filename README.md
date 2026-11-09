@@ -1,202 +1,248 @@
 # Voice-Based Personal Assistant
 
-A Python-based voice assistant that uses speech recognition, text-to-speech, APIs, and AI to perform common tasks through voice commands.
+A smart voice-based personal assistant developed using **Python, React, Flask, Artificial Intelligence, and Natural Language Processing (NLP)**. The assistant allows users to perform everyday tasks, control applications, access information, and interact with an AI-powered system through voice commands.
+
+The project combines speech recognition, natural language processing, AI-generated responses, and voice automation to provide an interactive and user-friendly experience through a modern web interface.
 
 ## Features
 
-* Voice command recognition using SpeechRecognition
-* Wake phrase support: **"Hey Buddy"**
-* AI-powered responses using **Groq API**
-* Answers general knowledge and conversational questions using AI
-* Weather information using OpenWeather API
-* News headlines using GNews API
-* Voice-based alarm with stop functionality
-* Apple Music control
-* Local music playback
-* YouTube search and playback
-* Google search
-* WhatsApp Web opening
-* Basic application control
-* Current time and date
-* Calculator and TextEdit support
-* MySQL database logging with SQLite fallback
-* Error handling and graceful fallback
+- **Voice Interaction:** Interact with the assistant using voice commands.
+- **Wake Word Detection:** Activate the assistant using the predefined wake word "Hey Buddy".
+- **AI-Powered Responses:** Generate intelligent responses using Groq AI powered by the GPT-OSS-120B model.
+- **Multilingual Voice Interaction:** Understand and respond to voice commands in multiple languages.
+- **Speech Recognition:** Convert spoken commands into text for processing.
+- **Text-to-Speech:** Convert assistant responses into speech for natural voice interaction.
+- **Application Control:** Open and close desktop applications such as WhatsApp, Calculator, and Text Editor using voice commands.
+- **Web Browser Control:** Open and close websites and web services such as Google and YouTube through voice commands.
+- **YouTube Music Playback:** Play music on YouTube using voice commands.
+- **Local Media Control:** Play and control local media files through voice commands.
+- **Weather Updates:** Retrieve weather information using a weather API.
+- **Latest News:** Fetch the latest news updates using the GNews API.
+- **Command Interruption:** Interrupt ongoing voice interactions when required.
+- **Real-Time Status Updates:** Display listening, processing, and response states through the web interface.
+- **Database Logging:** Store assistant interaction logs using MySQL, with SQLite fallback support.
+- **Interactive Web Interface:** Provide a modern React-based interface for voice interaction.
 
 ## Tech Stack
 
-* Python
-* SpeechRecognition
-* PyAudio
-* Groq API
-* OpenWeather API
-* GNews API
-* MySQL
-* SQLite
-* python-dotenv
-* macOS system utilities
+| Category | Technologies |
+|---|---|
+| Programming Languages | Python, JavaScript |
+| Frontend | React.js, HTML5, CSS3 |
+| Backend | Flask |
+| AI Integration | Groq AI, GPT-OSS-120B |
+| Natural Language Processing | NLP |
+| Speech Recognition | SpeechRecognition, PyAudio |
+| Text-to-Speech | Python-based TTS |
+| Database | MySQL, SQLite (fallback) |
+| API Integration | Weather API, GNews API |
+| Frontend Icons | Lucide React |
+| Communication | Flask REST API |
+| Build Tool | Vite |
+| Version Control | Git, GitHub |
 
 ## Project Structure
 
 ```text
 voice_assistant/
 │
+├── frontend/
+│   ├── public/
+│   │   └── mic.png
+│   │
+│   ├── src/
+│   │   ├── components/
+│   │   │   ├── Header.jsx
+│   │   │   ├── ResponseBox.jsx
+│   │   │   ├── StatusIndicator.jsx
+│   │   │   └── VoiceAssistant.jsx
+│   │   │
+│   │   ├── services/
+│   │   │   └── assistantApi.js
+│   │   │
+│   │   ├── App.css
+│   │   ├── App.jsx
+│   │   ├── index.css
+│   │   └── main.jsx
+│   │
+│   ├── .gitignore
+│   ├── eslint.config.js
+│   ├── index.html
+│   ├── package.json
+│   ├── package-lock.json
+│   └── vite.config.js
+│
+├── api.py
 ├── main.py
-├── README.md
 ├── requirements.txt
 ├── .env.example
-└── .gitignore
+├── .gitignore
+└── README.md
 ```
 
-## Requirements
-
-* Python 3
-* macOS
-* Microphone
-* Internet connection
-* API keys for:
-
-  * Groq
-  * OpenWeather
-  * GNews
-* MySQL (optional; SQLite fallback is available)
-
-## Setup
+## Installation and Setup
 
 ### 1. Clone the Repository
 
 ```bash
 git clone https://github.com/kajalshakya/voice_assistant.git
+
 cd voice_assistant
 ```
 
-### 2. Create a Virtual Environment
+### 2. Create a Python Virtual Environment
 
 ```bash
 python3 -m venv venv
 ```
 
-### 3. Activate the Virtual Environment
+Activate the virtual environment.
+
+**For macOS/Linux:**
 
 ```bash
 source venv/bin/activate
 ```
 
-### 4. Install Dependencies
+**For Windows:**
+
+```bash
+venv\Scripts\activate
+```
+
+### 3. Install Python Dependencies
 
 ```bash
 pip install -r requirements.txt
 ```
 
-### 5. Configure Environment Variables
+### 4. Configure Environment Variables
 
-Create a `.env` file from the example:
+Create a `.env` file in the root directory.
 
-```bash
-cp .env.example .env
-```
+Use `.env.example` as a reference and configure the following variables:
 
-Open `.env` and add your own API keys and database credentials:
-
-```env
-WEATHER_API_KEY=
-GNEWS_API_KEY=
-GROQ_API_KEY=
+```ini
+WEATHER_API_KEY=your_weather_api_key
+GNEWS_API_KEY=your_gnews_api_key
+GROQ_API_KEY=your_groq_api_key
 
 MYSQL_HOST=localhost
 MYSQL_USER=root
-MYSQL_PASSWORD=
+MYSQL_PASSWORD=your_mysql_password
 MYSQL_DATABASE=assistant_logs
 ```
 
-Do not commit `.env` to GitHub.
+Replace the placeholder values with your actual API keys and database credentials.
 
-### 6. Run the Assistant
+### 5. Configure MySQL Database
+
+Make sure MySQL is installed and running on your system.
+
+Create the database:
+
+```sql
+CREATE DATABASE assistant_logs;
+```
+
+The application uses MySQL to maintain assistant interaction logs. SQLite fallback support is also available.
+
+### 6. Start the Python Voice Assistant
+
+Open a terminal in the project root, activate the virtual environment, and run:
 
 ```bash
-python3 main.py
+python main.py
 ```
 
-## Example Voice Commands
+### 7. Start the Flask Backend
 
-### General Commands
+Open another terminal in the project root.
+
+Activate the virtual environment and run:
+
+```bash
+python api.py
+```
+
+The Flask backend runs at:
 
 ```text
-Hey Buddy, what's the time?
-Hey Buddy, what's the date?
-Hey Buddy, what's the weather?
-Hey Buddy, what's the news?
+http://127.0.0.1:5000
 ```
 
-### AI Questions
+### 8. Start the React Frontend
 
-```text
-Hey Buddy, what is artificial intelligence?
-Hey Buddy, explain machine learning.
-Hey Buddy, what is the difference between AI and machine learning?
-Hey Buddy, explain cloud computing.
-Hey Buddy, what is Python?
+Open another terminal:
+
+```bash
+cd frontend
 ```
 
-The assistant uses the **Groq API** to generate AI-based responses for general knowledge and conversational questions.
+Install frontend dependencies:
 
-### Music and Media
-
-```text
-Hey Buddy, play music
-Hey Buddy, play [song name]
-Hey Buddy, stop music
-Hey Buddy, open YouTube
+```bash
+npm install
 ```
 
-### Other Commands
+Start the development server:
 
-```text
-Hey Buddy, set an alarm
-Hey Buddy, search Google
-Hey Buddy, open WhatsApp
-Hey Buddy, open calculator
-Hey Buddy, open TextEdit
+```bash
+npm run dev
 ```
 
-## Error Handling
+Open the local development URL displayed in the terminal to access the assistant interface.
 
-The assistant handles common errors such as:
+## API Endpoints
 
-* Speech recognition failures
-* API request failures
-* Invalid city names
-* Database connection failures
-* Missing or unavailable services
+The Flask backend provides the following API endpoints:
 
-If MySQL is unavailable, the assistant can fall back to SQLite for local logging.
+| Method | Endpoint | Description |
+|---|---|---|
+| POST | `/api/voice-command` | Initiates voice command processing |
+| GET | `/api/status` | Retrieves the current assistant status |
+| POST | `/api/interrupt` | Interrupts an ongoing voice command |
 
-## Security
+## Application Workflow
 
-* API keys and database passwords are stored in environment variables.
-* `.env` is excluded from version control using `.gitignore`.
-* `.env.example` is provided as a safe configuration template.
-* Secret credentials are not stored directly in the source code.
+1. The user activates the assistant using the wake word "Hey Buddy" or the microphone button.
+2. The speech recognition module captures the user's voice.
+3. The recognized command is processed by the Python backend.
+4. The assistant identifies the requested task using command processing and NLP.
+5. For AI-based queries, Groq AI generates an appropriate response using the GPT-OSS-120B model.
+6. For specific commands, the assistant performs the corresponding operation, such as opening applications, playing media, or retrieving weather and news information.
+7. The response is converted into speech using text-to-speech functionality.
+8. The React frontend displays the assistant response and real-time status updates.
+9. Interaction logs are maintained using MySQL, with SQLite fallback support.
 
-## Future Improvements
+## Environment Variables and Security
 
-The project can be further enhanced with the following features:
+- API keys and sensitive credentials are stored in environment variables.
+- The `.env` file is excluded from version control.
+- The `.env.example` file provides a template for required environment variables.
+- Database credentials are not hardcoded into the application.
+- Virtual environments and Node.js dependencies are excluded from version control.
+- Sensitive configuration files should never be uploaded to a public GitHub repository.
 
-* **Offline voice recognition** to allow basic commands without an internet connection.
-* **Multilingual voice support** for interacting with the assistant in multiple languages.
-* **Personalized responses** based on user preferences and previous interactions.
-* **Machine learning-based intent detection** for better understanding of natural language commands.
-* **Context-aware conversations** so the assistant can understand follow-up questions.
-* **Voice authentication** to identify authorized users.
-* **IoT integration** to control smart home devices using voice commands.
-* **Personal task management** including reminders, calendar events, and to-do lists.
-* **More system automation** such as controlling applications, files, and system settings.
-* **Improved security and privacy** with better local processing and secure credential management.
-* **Web-based interface** for monitoring assistant activity and managing settings.
-* **Expanded API integrations** for services such as maps, email, and other productivity tools.
+## Future Enhancements
 
-## Author
+- Improve speech recognition accuracy.
+- Enhance multilingual conversation capabilities.
+- Add more desktop application integrations.
+- Improve AI response speed and efficiency.
+- Introduce personalized user preferences.
+- Expand voice-based automation capabilities.
+- Enhance the overall user interface and experience.
+
+## Developer
 
 **Kajal Shakya**
 
-MCA — Indira Gandhi Delhi Technical University for Women (IGDTUW)
+MCA Student  
+Indira Gandhi Delhi Technical University for Women (IGDTUW), New Delhi
 
+GitHub: [kajalshakya](https://github.com/kajalshakya)
+
+## License
+
+This project is developed for educational and personal learning purposes.

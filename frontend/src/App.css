@@ -1,0 +1,622 @@
+
+/* =====================================
+   GLOBAL STYLES
+===================================== */
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+body {
+  font-family: "Inter", "Segoe UI", sans-serif;
+  background: #080d18;
+  color: #ffffff;
+}
+
+/* =====================================
+   MAIN APP
+===================================== */
+
+.app {
+  width: 100%;
+  height: 100vh;
+  height: 100dvh;
+  padding: 8px 6.5%;
+
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+
+  background:
+    radial-gradient(
+      circle at 50% 42%,
+      #14213b 0%,
+      transparent 48%
+    ),
+    #080d18;
+}
+
+/* =====================================
+   HEADER
+===================================== */
+
+.header {
+  width: 100%;
+  min-height: 60px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid #25344c;
+  flex-shrink: 0;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+}
+
+.brand-icon {
+  width: 42px;
+  height: 42px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 12px;
+  color: #62c7ff;
+  background: #132b46;
+  border: 1px solid #245079;
+}
+
+.brand-text h2 {
+  font-size: 17px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  color: #f1f5ff;
+}
+
+.system-status {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font-size: 13px;
+  color: #a5b4cc;
+}
+
+.status-dot {
+  width: 9px;
+  height: 9px;
+  background: #20d69b;
+  border-radius: 50%;
+  box-shadow: 0 0 10px #20d69b;
+}
+
+.error-dot {
+  background: #ff5252;
+  box-shadow: 0 0 10px #ff5252;
+}
+
+/* =====================================
+   MAIN CONTAINER
+===================================== */
+
+.main-container {
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  max-width: 1100px;
+  margin: 0 auto;
+
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: space-evenly;
+
+  gap: 10px;
+  padding: 8px 0;
+}
+
+/* =====================================
+   VOICE ASSISTANT
+===================================== */
+
+.voice-section {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  flex-shrink: 0;
+}
+
+.voice-section h1 {
+  font-size: clamp(25px, 2.5vw, 34px);
+  font-weight: 700;
+  line-height: 1.2;
+  color: #f5f7ff;
+  margin-bottom: 8px;
+}
+
+.voice-section h1 span {
+  color: #f5f7ff;
+}
+
+/* Microphone */
+
+.mic-wrapper {
+  position: relative;
+  width: 95px;
+  height: 95px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.mic-button {
+  position: relative;
+  z-index: 2;
+
+  width: 82px;
+  height: 82px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  border-radius: 50%;
+  border: 1px solid #3476a8;
+
+  background: linear-gradient(
+    145deg,
+    #153b62,
+    #10233e
+  );
+
+  color: #69ceff;
+  cursor: pointer;
+
+  box-shadow:
+    0 0 25px rgba(36, 157, 255, 0.15),
+    inset 0 0 15px rgba(36, 157, 255, 0.08);
+
+  transition: all 0.3s ease;
+}
+
+.mic-button:hover {
+  transform: scale(1.05);
+  box-shadow: 0 0 35px rgba(36, 157, 255, 0.35);
+}
+
+.mic-button.mic-active {
+  background: linear-gradient(
+    145deg,
+    #145b85,
+    #102b4c
+  );
+
+  border-color: #4bc7ff;
+  box-shadow: 0 0 30px rgba(36, 157, 255, 0.3);
+}
+
+.mic-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Pulse Animation */
+
+.pulse {
+  position: absolute;
+  width: 82px;
+  height: 82px;
+  border: 2px solid #42baff;
+  border-radius: 50%;
+  z-index: 1;
+  animation: micPulse 2s infinite;
+  pointer-events: none;
+}
+
+.pulse-two {
+  animation-delay: 1s;
+}
+
+@keyframes micPulse {
+  0% {
+    transform: scale(1);
+    opacity: 0.7;
+  }
+
+  100% {
+    transform: scale(1.65);
+    opacity: 0;
+  }
+}
+
+/* Click to Speak */
+
+.mic-heading {
+  display: block;
+  font-size: 21px;
+  font-weight: 700;
+  color: #f0f5ff;
+  margin-top: 7px;
+  margin-bottom: 4px;
+}
+
+.mic-description {
+  display: block;
+  font-size: 14px;
+  line-height: 1.5;
+  color: #a5b4cc;
+}
+
+/* Sound Wave */
+
+.wave-container {
+  height: 25px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  margin-top: 5px;
+}
+
+.wave-bar {
+  width: 4px;
+  height: 8px;
+  border-radius: 10px;
+  background: #52c7ff;
+  animation: waveAnimation 0.8s ease-in-out infinite alternate;
+}
+
+@keyframes waveAnimation {
+  from {
+    height: 6px;
+    opacity: 0.5;
+  }
+
+  to {
+    height: 25px;
+    opacity: 1;
+  }
+}
+
+/* =====================================
+   ASSISTANT STATUS
+===================================== */
+
+.assistant-status-section {
+  width: 100%;
+  flex-shrink: 0;
+  margin: 0;
+}
+
+.section-heading {
+  text-align: center;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  color: #8295b3;
+  margin-bottom: 8px;
+}
+
+.status-container {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 15px;
+}
+
+.status-card {
+  position: relative;
+  flex: 1;
+  max-width: 300px;
+  height: 55px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+
+  background: #101a2b;
+  border: 1px solid #25344c;
+  border-radius: 12px;
+
+  color: #8291aa;
+  font-size: 14px;
+  transition: all 0.3s ease;
+}
+
+.status-card.active {
+  color: #63c9ff;
+  background: #122a43;
+  border-color: #368bc0;
+
+  box-shadow: 0 0 15px rgba(54, 139, 192, 0.12);
+}
+
+.active-line {
+  position: absolute;
+  bottom: -1px;
+  left: 25%;
+  width: 50%;
+  height: 2px;
+  background: #52c7ff;
+  border-radius: 10px;
+}
+
+/* =====================================
+   RESPONSE BOX
+===================================== */
+
+.response-box {
+  width: 100%;
+  max-width: 850px;
+
+  padding: 13px 20px;
+
+  background: #101a2b;
+  border: 1px solid #26364e;
+  border-radius: 15px;
+
+  box-shadow: 0 10px 35px rgba(0, 0, 0, 0.15);
+
+  flex: 0 1 auto;
+  min-height: 135px;
+  max-height: 30vh;
+
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+.response-box::-webkit-scrollbar {
+  width: 5px;
+}
+
+.response-box::-webkit-scrollbar-thumb {
+  background: #3476a8;
+  border-radius: 10px;
+}
+
+.response-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: #64c9ff;
+  margin-bottom: 10px;
+}
+
+.response-title h3 {
+  font-size: 17px;
+  color: #f0f5ff;
+}
+
+.response-content {
+  margin-bottom: 8px;
+}
+
+.content-label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 1.5px;
+  color: #7892b4;
+  margin-bottom: 5px;
+}
+
+.content-text {
+  font-size: 14px;
+  line-height: 1.4;
+  color: #d5dfef;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+.response-divider {
+  height: 1px;
+  background: #28364c;
+  margin: 8px 0;
+}
+
+.voice-response-label {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  color: #63c9ff;
+}
+
+.voice-response-label .content-label {
+  margin-bottom: 5px;
+}
+
+/* =====================================
+   FOOTER
+===================================== */
+
+.footer {
+  width: 100%;
+  flex-shrink: 0;
+  text-align: center;
+  padding: 0 0 3px;
+  color: #65758e;
+  font-size: 12px;
+}
+
+/* =====================================
+   SMALL LAPTOP SCREENS
+===================================== */
+
+@media (max-height: 750px) {
+  .app {
+    padding-top: 5px;
+    padding-bottom: 5px;
+  }
+
+  .header {
+    min-height: 52px;
+  }
+
+  .brand-icon {
+    width: 36px;
+    height: 36px;
+  }
+
+  .main-container {
+    gap: 6px;
+    padding: 5px 0;
+  }
+
+  .voice-section h1 {
+    font-size: 27px;
+    margin-bottom: 4px;
+  }
+
+  .mic-wrapper {
+    width: 78px;
+    height: 78px;
+  }
+
+  .mic-button {
+    width: 68px;
+    height: 68px;
+  }
+
+  .mic-button svg {
+    width: 30px;
+    height: 30px;
+  }
+
+  .pulse {
+    width: 68px;
+    height: 68px;
+  }
+
+  .mic-heading {
+    font-size: 18px;
+    margin-top: 3px;
+  }
+
+  .mic-description {
+    font-size: 12px;
+  }
+
+  .wave-container {
+    height: 17px;
+    margin-top: 2px;
+  }
+
+  .section-heading {
+    margin-bottom: 5px;
+  }
+
+  .status-card {
+    height: 46px;
+  }
+
+  .response-box {
+    min-height: 115px;
+    max-height: 27vh;
+    padding: 10px 16px;
+  }
+
+  .response-title {
+    margin-bottom: 7px;
+  }
+
+  .response-content {
+    margin-bottom: 5px;
+  }
+
+  .response-divider {
+    margin: 6px 0;
+  }
+}
+
+/* =====================================
+   NARROW SCREENS
+===================================== */
+
+@media (max-width: 768px) {
+  .app {
+    padding-left: 4%;
+    padding-right: 4%;
+  }
+
+  .main-container {
+    gap: 10px;
+  }
+
+  .status-container {
+    gap: 8px;
+  }
+
+  .status-card {
+    font-size: 12px;
+    gap: 7px;
+  }
+
+  .response-box {
+    padding: 12px;
+  }
+}
+
+@media (max-width: 480px) {
+  .brand-text h2 {
+    font-size: 13px;
+    letter-spacing: 1px;
+  }
+
+  .system-status {
+    font-size: 11px;
+  }
+
+  .voice-section h1 {
+    font-size: 24px;
+  }
+
+  .status-card {
+    height: 48px;
+    font-size: 11px;
+  }
+
+  .response-box {
+    max-height: 32vh;
+  }
+}
+
+.processing-indicator {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  margin-top: 22px;
+  color: #a5b4fc;
+  font-size: 14px;
+}
+
+.processing-spinner {
+  animation: spin 1s linear infinite;
+  flex-shrink: 0;
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+
+  to {
+    transform: rotate(360deg);
+  }
+}
