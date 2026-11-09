@@ -260,19 +260,40 @@ def process_command(command, command_id):
 
         intent = "youtube_song"
 
-    # --------------------------------------------------------
+     # --------------------------------------------------------
     # APPLE MUSIC
     # --------------------------------------------------------
 
     elif "apple music" in cmd:
 
+        # Remove wake word
         song = re.sub(
-            r"\b(play|on apple music|on apple)\b",
+            r"^\s*hey\s+buddy[\s,]*",
             "",
-            cmd
+            cmd,
+            flags=re.IGNORECASE
+        )
+
+        # Remove music platform name
+        song = re.sub(
+            r"\bon\s+apple\s+music\b|\bon\s+apple\b",
+            "",
+            song,
+            flags=re.IGNORECASE
+        )
+
+        # Remove play command
+        song = re.sub(
+            r"^\s*play\s+",
+            "",
+            song,
+            count=1,
+            flags=re.IGNORECASE
         ).strip()
 
         if song:
+
+            print("[DEBUG] Apple Music search:", song)
 
             response = assistant.play_apple_music_song(song)
 

@@ -1868,28 +1868,32 @@ def main():
             ):
 
                 song = re.sub(
-                    r"\bon apple music\b",
+                    r"^\s*hey\s+buddy[\s,]*",
                     "",
-                    cmd
+                    cmd,
+                    flags=re.IGNORECASE
                 )
 
                 song = re.sub(
-                    r"\bon apple\b",
+                    r"\bon apple music\b|\bon apple\b",
                     "",
-                    song
+                    song,
+                    flags=re.IGNORECASE
                 )
 
-                song = song.replace(
-                    "play",
+                song = re.sub(
+                    r"^\s*play\s+",
                     "",
-                    1
+                    song,
+                    count=1,
+                    flags=re.IGNORECASE
                 ).strip()
 
                 if song:
 
-                    response = (
-                        play_apple_music_song(song)
-                    )
+                    print("[DEBUG] Apple Music search:", song)
+
+                    response = play_apple_music_song(song)
 
                     speak(response)
 
@@ -1901,9 +1905,7 @@ def main():
 
                 else:
 
-                    speak(
-                        "Please tell me the song name."
-                    )
+                    speak("Please tell me the song name.")
 
                 assistant_prompt()
                 continue
